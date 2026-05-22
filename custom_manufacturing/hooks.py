@@ -246,4 +246,20 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
+doctype_js = {
+    "Work Order": "public/js/work_order.js"
+}
 
+override_doctype_class = {
+    "Work Order": "custom_manufacturing.overrides.work_order.CustomWorkOrder"
+}
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["dt", "=", "Work Order"],
+            ["fieldname", "=", "custom_allow_without_bom"]
+        ]
+    }
+]
