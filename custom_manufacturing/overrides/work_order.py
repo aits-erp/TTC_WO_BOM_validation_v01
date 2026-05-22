@@ -4,49 +4,41 @@ from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder
 
 
 class CustomWorkOrder(WorkOrder):
-    """
-    Custom Work Order override
-    Allows Work Orders without BOM.
-    Preserves standard ERPNext behavior when checkbox is unchecked.
-    """
 
     def validate(self):
-        """
-        Main validation override.
-
-        STANDARD FLOW:
-        If checkbox is NOT enabled:
-        -> Run normal ERPNext validation
-
-        CUSTOM FLOW:
-        If checkbox IS enabled:
-        -> Skip BOM validation
-        -> Allow manual raw materials
-        -> Allow manual operations
-        """
-
-        # STANDARD ERPNext FLOW
-        if not self.custom_allow_without_bom:
-            super().validate()
-            return
 
         # CUSTOM FLOW WITHOUT BOM
+        if self.custom_allow_without_bom:
 
-        # Keep standard quantity validation
-        self.validate_qty()
+            # Temporary fake BOM bypass
+            original_bom = self.bom_no
 
-        # Validate manually entered items
-        self.validate_required_items()
+            # Put dummy value so ERPNext internal validations continue
+            self.bom_no = None
 
-        # Validate manually entered operations
-        self.validate_operations()
+            # Run standard ERPNext validations
+            try:
+                super().validate()
+
+            except Exception as e:
+
+                # Ignore only BOM mandatory errors
+                if "BOM" not in str(e):
+                    raise
+
+            # Restore BOM
+            self.bom_no = original_bom
+
+            # Ensure manual raw materials exist
+            self.validate_required_items()
+
+            return
+
+        # STANDARD ERPNext FLOW
+        super().validate()
 
 
     def validate_required_items(self):
-        """
-        Ensure Required Items table is not empty
-        when BOM is bypassed.
-        """
 
         if not self.required_items:
             frappe.throw(
@@ -54,56 +46,17 @@ class CustomWorkOrder(WorkOrder):
             )
 
 
-    def validate_operations(self):
-        """
-        Optional validation for operations.
-
-        Uncomment if operations should be mandatory.
-        """
-
-        """
-        if not self.operations:
-            frappe.throw(
-                _("Operations table cannot be empty.")
-            )
-        """
-
-        pass
-
-
     def set_required_items(self, reset_only_qty=False):
-        """
-        Prevent ERPNext from auto-fetching BOM items
-        when custom checkbox is enabled.
-        """
 
         if self.custom_allow_without_bom:
             return
 
-        # STANDARD ERPNext BEHAVIOR
         super().set_required_items(reset_only_qty)
 
 
     def set_operations(self):
-        """
-        Prevent ERPNext from auto-fetching operations
-        from BOM when checkbox enabled.
-        """
 
         if self.custom_allow_without_bom:
             return
 
-        # STANDARD ERPNext BEHAVIOR
         super().set_operations()
-
-
-    def validate_bom_no(self):
-        """
-        Skip BOM validation when custom checkbox enabled.
-        """
-
-        if self.custom_allow_without_bom:
-            return
-
-        # STANDARD ERPNext BEHAVIOR
-        super().validate_bom_no()
