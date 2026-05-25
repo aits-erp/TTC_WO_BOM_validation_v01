@@ -5,23 +5,16 @@ from erpnext.manufacturing.doctype.work_order.work_order import WorkOrder
 class CustomWorkOrder(WorkOrder):
 
     def before_validate(self):
-        # 1. THE BYPASS: Tell Frappe to skip the database-level mandatory check
         if self.custom_allow_without_bom:
             self.flags.ignore_mandatory = True
             self.bom_no = None
-
-        # Execute standard before_validate if ERPNext adds one in the future
         try:
             super().before_validate()
         except AttributeError:
             pass
 
     def validate(self):
-        # CUSTOM FLOW WITHOUT BOM
         if self.custom_allow_without_bom:
-            
-            # 2. Because we told the backend to ignore ALL mandatory fields, 
-            # we must manually verify the critical ones just to be safe.
             critical_fields = {
                 "production_item": "Item To Manufacture",
                 "qty": "Qty To Manufacture",
@@ -34,17 +27,14 @@ class CustomWorkOrder(WorkOrder):
                 if not getattr(self, field):
                     frappe.throw(_("{0} is a mandatory field").format(label))
 
-            # Skip core BOM-based validations
             self.validate_qty()
             self.validate_required_items_custom()
             
-            # Recalculate costs based on manually added items/operations
             if hasattr(self, "calculate_operating_cost"):
                 self.calculate_operating_cost()
                 
             return
 
-        # STANDARD ERPNext FLOW
         if not self.bom_no:
             frappe.throw(_("BOM No is mandatory when 'Allow Without BOM' is unchecked."))
             
@@ -63,3 +53,14 @@ class CustomWorkOrder(WorkOrder):
         if self.custom_allow_without_bom:
             return
         super().set_operations()
+
+    # ====================================================================
+    # THE FIX: Explicitly set the status to "Not Started" on Submit
+    # ====================================================================
+    def on_submit(self):
+        if self.custom_allow_without_bom:
+            self.status = "Not Started"
+            self.db_set("status", "Not Started")
+            
+        # Run the standard Job Card creation and submit logic
+        super().on_submit()
